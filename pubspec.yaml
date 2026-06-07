@@ -2,11 +2,29 @@ name: khatm
 description: A new Flutter project.
 publish_to: 'none'
 version: 1.0.0+1
+
 environment:
   sdk: ^3.0.0
+
 dependencies:
   flutter:
     sdk: flutter
   shared_preferences: ^2.2.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  # سنضيف هذه المكتبة لتغيير الأيقونة تلقائياً
+  flutter_launcher_icons: ^0.13.1
+
+# إعدادات مكتبة الأيقونات (تأكد من وجود ملف icon.png في المشروع)
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "icon.png"
+
 flutter:
   uses-material-design: true
+  # تعريف ملف صورة غزة كأصل من أصول التطبيق
+  assets:
+    - gaza.png
