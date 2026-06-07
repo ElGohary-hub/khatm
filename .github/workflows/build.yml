@@ -31,8 +31,15 @@ jobs:
           mv temp_app/android .
           rm -rf temp_app
 
+      - name: Change App Name to Arabic
+        run: |
+          sed -i 's/android:label="khatm"/android:label="خاتم تسبيح"/g' android/app/src/main/AndroidManifest.xml
+
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Generate App Icons
+        run: dart run flutter_launcher_icons
 
       - name: Build APK
         run: flutter build apk --release
@@ -40,5 +47,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Khatm-App-APK
+          name: Khatm-Tasbeeh-APK
           path: build/app/outputs/flutter-apk/app-release.apk
