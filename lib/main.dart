@@ -430,15 +430,24 @@ class _TasbeehScreenState extends State<TasbeehScreen> with AutomaticKeepAliveCl
               height: 210,
               width: MediaQuery.of(context).size.width * 0.85,
               decoration: BoxDecoration(
-                color: isDarkMode ? Colors.grey[900] : Colors.grey[200],
+                color: Colors.transparent, 
                 border: Border.all(color: borderColor, width: 1),
                 borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   if (!isDarkMode) BoxShadow(color: Colors.grey.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5))
                 ]
               ),
-              child: Center(
-                 child: Icon(Icons.mosque, size: 80, color: isDarkMode ? Colors.white30 : Colors.black26),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(17),
+                child: Image.asset(
+                  'gaza.png', 
+                  fit: BoxFit.cover, 
+                  errorBuilder: (context, error, stackTrace) {
+                     return Center(
+                       child: Icon(Icons.mosque, size: 80, color: isDarkMode ? Colors.white30 : Colors.black26),
+                     );
+                  }
+                ),
               ),
             ),
 
@@ -532,4 +541,3 @@ class _TasbeehScreenState extends State<TasbeehScreen> with AutomaticKeepAliveCl
     );
   }
 }
-
