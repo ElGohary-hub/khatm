@@ -14,10 +14,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  # سنضيف هذه المكتبة لتغيير الأيقونة تلقائياً
   flutter_launcher_icons: ^0.13.1
 
-# إعدادات مكتبة الأيقونات (تأكد من وجود ملف icon.png في المشروع)
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
@@ -25,6 +23,5 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
-  # تعريف ملف صورة غزة كأصل من أصول التطبيق
   assets:
     - gaza.png
