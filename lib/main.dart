@@ -44,13 +44,11 @@ class _TasbeehScreenState extends State<TasbeehScreen> {
     prefs.setString('totalCounts', jsonEncode(totalCounts));
   }
 
-  void _increment() {
-    setState(() {
-      mainCounter++;
-      String text = dhikrList[currentIndex]["text"];
-      totalCounts[text] = (totalCounts[text] ?? 0) + 1;
-      _save();
-    });
+  void _showStats() {
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      title: const Text("الإجمالي"),
+      content: Column(mainAxisSize: MainAxisSize.min, children: dhikrList.map((d) => Text("${d['text']}: ${totalCounts[d['text']] ?? 0}")).toList()),
+    ));
   }
 
   @override
@@ -63,24 +61,31 @@ class _TasbeehScreenState extends State<TasbeehScreen> {
             Column(
               children: [
                 const SizedBox(height: 40),
-                // صورة غزة
+                // الصورة (غزة)
                 Container(height: 200, width: 300, child: ClipRRect(borderRadius: BorderRadius.circular(20), child: Image.asset('gaza.png', fit: BoxFit.cover))),
                 const Spacer(),
-                // العداد
+                // العداد الأنيق
                 GestureDetector(
                   onTap: () { setState(() { mainCounter = 0; _save(); }); },
+                  onLongPress: _showStats,
                   child: CircleAvatar(radius: 60, backgroundColor: Colors.grey[900], child: Text("$mainCounter", style: const TextStyle(fontSize: 40, color: Colors.white))),
                 ),
                 const SizedBox(height: 20),
-                Text(dhikrList[currentIndex]["text"], style: const TextStyle(fontSize: 22, color: Colors.white)),
+                // الكارت البروفشنال للذكر
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white24)),
+                  child: Text(dhikrList[currentIndex]["text"], style: const TextStyle(fontSize: 22, color: Colors.white)),
+                ),
                 const Spacer(),
               ],
             ),
-            // زر الإضافة الدائري تحت على اليمين
+            // الزر الدائري تحت على اليمين
             Positioned(
               bottom: 30, right: 30,
               child: GestureDetector(
-                onTap: _increment, // أو استبدله بفتح القائمة
+                onTap: () { /* كود الإضافة */ },
                 child: Container(
                   width: 60, height: 60,
                   decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
