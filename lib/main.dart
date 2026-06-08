@@ -1,98 +1,540 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:convert'; 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MaterialApp(debugShowCheckedModeBanner: false, home: TasbeehScreen()));
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]).then((_) {
+    runApp(const MyApp());
+  });
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'خاتم', 
+      theme: ThemeData(fontFamily: 'Cairo'),
+      builder: (context, child) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: child!,
+        );
+      },
+      home: const TasbeehScreen(),
+    );
+  }
 }
 
 class TasbeehScreen extends StatefulWidget {
   const TasbeehScreen({super.key});
+
   @override
   _TasbeehScreenState createState() => _TasbeehScreenState();
 }
 
-class _TasbeehScreenState extends State<TasbeehScreen> {
+class _TasbeehScreenState extends State<TasbeehScreen> with AutomaticKeepAliveClientMixin {
+  bool isFirstText = true;
+  Timer? _timer;
+
   int mainCounter = 0;
   int currentIndex = 0;
-  Map<String, int> totalCounts = {};
+  bool isDarkMode = true; 
+
   List<Map<String, dynamic>> dhikrList = [
     {"text": "استغفر الله العظيم", "target": 33},
     {"text": "سبحان الله", "target": 33},
+    {"text": "سبحان الله وبحمده سبحان الله العظيم", "target": 33},
+    {"text": "الحمد لله", "target": 33},
+    {"text": "الله اكبر", "target": 33},
+    {"text": "الله اكبر ولله الحمد", "target": 33},
+    {"text": "اللهم صلِّ علي محمد وآل محمد", "target": 33},
   ];
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      mainCounter = prefs.getInt('counter') ?? 0;
-      totalCounts = Map<String, int>.from(jsonDecode(prefs.getString('totalCounts') ?? '{}'));
+    loadSavedData(); 
+    
+    _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      setState(() {
+        isFirstText = !isFirstText;
+      });
     });
   }
 
-  Future<void> _save() async {
+  Future<void> loadSavedData() async {
     final prefs = await SharedPreferences.getInstance();
-    prefs.setInt('counter', mainCounter);
-    prefs.setString('totalCounts', jsonEncode(totalCounts));
+    setState(() {
+      mainCounter = prefs.getInt('counter') ?? 0;
+      currentIndex = prefs.getInt('index') ?? 0;
+      isDarkMode = prefs.getBool('isDarkMode') ?? true;
+      
+      String? savedList = prefs.getString('dhikrList');
+      if (savedList != null) {
+        List<dynamic> decodedList = jsonDecode(savedList);
+        dhikrList = decodedList.map((item) => Map<String, dynamic>.from(item)).toList();
+      }
+    });
   }
 
-  void _showStats() {
-    showDialog(context: context, builder: (ctx) => AlertDialog(
-      title: const Text("الإجمالي"),
-      content: Column(mainAxisSize: MainAxisSize.min, children: dhikrList.map((d) => Text("${d['text']}: ${totalCounts[d['text']] ?? 0}")).toList()),
-    ));
+  Future<void> saveData() async {
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setInt('counter', mainCounter);
+    prefs.setInt('index', currentIndex);
+    prefs.setBool('isDarkMode', isDarkMode);
+    prefs.setString('dhikrList', jsonEncode(dhikrList));
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void incrementCounter() {
+    HapticFeedback.lightImpact();
+    SystemSound.play(SystemSoundType.click); 
+
+    setState(() {
+      mainCounter++;
+      
+      if (mainCounter >= dhikrList[currentIndex]["target"]) {
+        currentIndex = (currentIndex + 1) % dhikrList.length;
+        mainCounter = 0; 
+        HapticFeedback.heavyImpact(); 
+      }
+      saveData(); 
+    });
+  }
+
+  void deleteDhikr(int index) {
+    if (dhikrList.length == 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("يجب ترك ذكر واحد على الأقل في القائمة.")),
+      );
+      return;
+    }
+
+    setState(() {
+      dhikrList.removeAt(index);
+      if (currentIndex >= dhikrList.length) {
+        currentIndex = 0;
+        mainCounter = 0;
+      } else if (currentIndex == index) {
+        mainCounter = 0;
+      }
+      saveData(); 
+    });
+    
+    Navigator.pop(context);
+    showDhikrMenu();
+  }
+
+  void addNewDhikr(BuildContext context) {
+    TextEditingController textController = TextEditingController();
+    TextEditingController targetController = TextEditingController(text: "33");
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
+          title: Text("إضافة ذكر جديد", style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: textController,
+                autofocus: true,
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: "اكتب الذكر هنا",
+                  labelStyle: const TextStyle(color: Colors.grey),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: isDarkMode ? Colors.white54 : Colors.black54)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: isDarkMode ? Colors.white : Colors.black)),
+                ),
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: targetController,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: "الرقم المستهدف (الهدف)",
+                  labelStyle: const TextStyle(color: Colors.grey),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: isDarkMode ? Colors.white54 : Colors.black54)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: isDarkMode ? Colors.white : Colors.black)),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("إلغاء", style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () {
+                if (textController.text.trim().isNotEmpty) {
+                  setState(() {
+                    int target = int.tryParse(targetController.text) ?? 33;
+                    dhikrList.add({
+                      "text": textController.text.trim(),
+                      "target": target > 0 ? target : 33
+                    });
+                    saveData(); 
+                  });
+                  Navigator.pop(context); 
+                  Navigator.pop(context); 
+                  showDhikrMenu(); 
+                }
+              },
+              child: const Text("إضافة", style: TextStyle(color: Colors.green)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void editTarget(BuildContext context, int index) {
+    TextEditingController controller = TextEditingController(
+      text: dhikrList[index]["target"].toString(),
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
+          title: Text("تعديل هدف (${dhikrList[index]['text']})", style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 16)),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            decoration: InputDecoration(
+              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: isDarkMode ? Colors.white54 : Colors.black54)),
+              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: isDarkMode ? Colors.white : Colors.black)),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("إلغاء", style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  int newTarget = int.tryParse(controller.text) ?? 33;
+                  if (newTarget > 0) {
+                    dhikrList[index]["target"] = newTarget;
+                    saveData(); 
+                  }
+                });
+                Navigator.pop(context); 
+                Navigator.pop(context); 
+                showDhikrMenu(); 
+              },
+              child: const Text("حفظ", style: TextStyle(color: Colors.green)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void showDhikrMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDarkMode ? Colors.grey[900] : Colors.grey[200],
+      isScrollControlled: true, 
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.65, 
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 45,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[500],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                ElevatedButton.icon(
+                  onPressed: () => addNewDhikr(context),
+                  icon: const Icon(Icons.add, size: 20),
+                  label: const Text("إضافة ذكر جديد الخاص بك", style: TextStyle(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green[800],
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Divider(color: isDarkMode ? Colors.white24 : Colors.black26, thickness: 1),
+                
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(12),
+                    itemCount: dhikrList.length,
+                    itemBuilder: (context, index) {
+                      bool isSelected = index == currentIndex;
+                      return Card(
+                        color: isSelected 
+                            ? Colors.green.withOpacity(0.2) 
+                            : (isDarkMode ? Colors.grey[850] : Colors.white),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        child: ListTile(
+                          title: Text(
+                            dhikrList[index]["text"],
+                            style: TextStyle(
+                              color: isSelected ? Colors.green[600] : (isDarkMode ? Colors.white : Colors.black), 
+                              fontSize: 16,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal
+                            ),
+                          ),
+                          subtitle: Text(
+                            "الرقم المستهدف: ${dhikrList[index]["target"]}",
+                            style: const TextStyle(color: Colors.grey, fontSize: 13),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit, color: Colors.blueAccent, size: 22),
+                                onPressed: () => editTarget(context, index),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.redAccent, size: 22),
+                                onPressed: () => deleteDhikr(index),
+                              ),
+                            ],
+                          ),
+                          onTap: () {
+                            setState(() {
+                              currentIndex = index;
+                              mainCounter = 0; 
+                              saveData(); 
+                            });
+                            Navigator.pop(context);
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
+    Color bgColor = isDarkMode ? Colors.black : Colors.grey[50]!;
+    Color textColor = isDarkMode ? Colors.white : Colors.black87;
+    Color boxColor = isDarkMode ? Colors.grey[900]! : Colors.white;
+    Color borderColor = isDarkMode ? Colors.white30 : Colors.black26;
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: bgColor, 
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
-            Column(
-              children: [
-                const SizedBox(height: 40),
-                // الصورة (غزة)
-                Container(height: 200, width: 300, child: ClipRRect(borderRadius: BorderRadius.circular(20), child: Image.asset('gaza.png', fit: BoxFit.cover))),
-                const Spacer(),
-                // العداد الأنيق
-                GestureDetector(
-                  onTap: () { setState(() { mainCounter = 0; _save(); }); },
-                  onLongPress: _showStats,
-                  child: CircleAvatar(radius: 60, backgroundColor: Colors.grey[900], child: Text("$mainCounter", style: const TextStyle(fontSize: 40, color: Colors.white))),
-                ),
-                const SizedBox(height: 20),
-                // الكارت البروفشنال للذكر
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                  decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white24)),
-                  child: Text(dhikrList[currentIndex]["text"], style: const TextStyle(fontSize: 22, color: Colors.white)),
-                ),
-                const Spacer(),
-              ],
+            const SizedBox(height: 15),
+            
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      isDarkMode ? Icons.light_mode : Icons.dark_mode, 
+                      color: isDarkMode ? Colors.amber : Colors.indigo
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        isDarkMode = !isDarkMode;
+                        saveData(); 
+                      });
+                    },
+                  ),
+                  
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: boxColor,
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: borderColor),
+                      boxShadow: [
+                        if (!isDarkMode) BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 5, spreadRadius: 1)
+                      ]
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 20),
+                        const SizedBox(width: 10),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 600), 
+                          transitionBuilder: (Widget child, Animation<double> animation) {
+                            return FadeTransition(opacity: animation, child: child);
+                          },
+                          child: Text(
+                            isFirstText ? "مَا نَقَصَ مَالٌ مِنْ صَدَقَةٍ" : "الصدقة جسر إلى الجَنَّةِ",
+                            key: ValueKey<bool>(isFirstText),
+                            style: TextStyle(color: textColor, fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 48), 
+                ],
+              ),
             ),
-            // الزر الدائري تحت على اليمين
-            Positioned(
-              bottom: 30, right: 30,
-              child: GestureDetector(
-                onTap: () { /* كود الإضافة */ },
-                child: Container(
-                  width: 60, height: 60,
-                  decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                  child: const Icon(Icons.add, color: Colors.white, size: 30),
+
+            const SizedBox(height: 35),
+
+            Container(
+              height: 210,
+              width: MediaQuery.of(context).size.width * 0.85,
+              decoration: BoxDecoration(
+                color: Colors.transparent, 
+                border: Border.all(color: borderColor, width: 1),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  if (!isDarkMode) BoxShadow(color: Colors.grey.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5))
+                ]
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(17),
+                child: Image.asset(
+                  'gaza.png', 
+                  fit: BoxFit.cover, 
+                  errorBuilder: (context, error, stackTrace) {
+                     return Center(
+                       child: Icon(Icons.mosque, size: 80, color: isDarkMode ? Colors.white30 : Colors.black26),
+                     );
+                  }
                 ),
               ),
             ),
+
+            const Expanded(child: SizedBox()), 
+
+            GestureDetector(
+              onTap: showDhikrMenu, 
+              onLongPress: showDhikrMenu, 
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+                child: Text(
+                  dhikrList[currentIndex]["text"],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: textColor, fontSize: 30, fontWeight: FontWeight.bold, height: 1.4),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 40),
+
+            GestureDetector(
+              onLongPress: () {
+                HapticFeedback.vibrate(); 
+                setState(() {
+                  mainCounter = 0;
+                  saveData(); 
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("تم تصفير العداد"), duration: Duration(seconds: 1)),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 45, vertical: 15),
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.grey[950] : Colors.white,
+                  border: Border.all(color: borderColor),
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    if (!isDarkMode) BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4))
+                  ]
+                ),
+                child: Text(
+                  mainCounter.toString().padLeft(4, '0'), 
+                  style: TextStyle(color: textColor, fontSize: 52, letterSpacing: 6, fontWeight: FontWeight.w300),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 50),
+
+            GestureDetector(
+              onTap: incrementCounter,
+              child: Container(
+                width: 130,
+                height: 130,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: isDarkMode 
+                        ? [Colors.grey[800]!, Colors.black] 
+                        : [Colors.white, Colors.grey[300]!],
+                    radius: 0.85,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.15),
+                      spreadRadius: 3,
+                      blurRadius: 15,
+                      offset: const Offset(0, 5)
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Container(
+                    width: 110,
+                    height: 110,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: isDarkMode ? Colors.white12 : Colors.black12, width: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 55),
           ],
         ),
       ),
